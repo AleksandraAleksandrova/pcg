@@ -1,0 +1,16 @@
+# Python virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Input audio files and generated results
+/wavs/*
+!/wavs/README.md
+
+/results/*
+!/results/README.md
+
+# IDE settings
+.vscode/
