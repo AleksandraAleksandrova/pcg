@@ -64,6 +64,63 @@ def process_pcg(input_path: str) -> tuple[Path, Path, dict]:
     fig.suptitle(f"Обработка на фонокардиограма — {input_path.name}")
     fig.tight_layout()
     fig.savefig(output_plot, dpi=160, bbox_inches="tight")
+
+    window = np.hanning(len(mono))
+    window_sum = np.sum(window)
+
+    original_spectrum = np.abs(np.fft.rfft(mono * window)) / window_sum
+    filtered_spectrum = np.abs(np.fft.rfft(filtered * window)) / window_sum
+
+    if len(mono) % 2 == 0:
+        original_spectrum[1:-1] *= 2
+        filtered_spectrum[1:-1] *= 2
+    else:
+        original_spectrum[1:] *= 2
+        filtered_spectrum[1:] *= 2
+
+    frequencies = np.fft.rfftfreq(len(mono), d=1 / sample_rate)
+
+    original_db = 20 * np.log10(np.maximum(original_spectrum, 1e-12))
+    filtered_db = 20 * np.log10(np.maximum(filtered_spectrum, 1e-12))
+
+    frequency_limit = min(500, sample_rate / 2)
+    visible = frequencies <= frequency_limit
+
+    output_spectrum = results_dir / f"{input_path.stem}_spectrum.png"
+
+    fig_spectrum, ax_spectrum = plt.subplots(figsize=(11, 6))
+    ax_spectrum.plot(
+        frequencies[visible],
+        original_db[visible],
+        linewidth=0.8,
+        label="Преди филтриране",
+    )
+    ax_spectrum.plot(
+        frequencies[visible],
+        filtered_db[visible],
+        linewidth=0.8,
+        label="След филтриране",
+    )
+
+    ax_spectrum.axvline(
+        20, color="gray", linestyle="--", linewidth=1, label="Граница 20 Hz"
+    )
+    ax_spectrum.axvline(
+        400, color="black", linestyle="--", linewidth=1, label="Граница 400 Hz"
+    )
+
+    ax_spectrum.set_title(
+        f"Амплитудни спектри преди и след филтриране — {input_path.name}"
+    )
+    ax_spectrum.set_xlabel("Честота (Hz)")
+    ax_spectrum.set_ylabel("Амплитуда (dB)")
+    ax_spectrum.set_xlim(0, frequency_limit)
+    ax_spectrum.grid(True, alpha=0.3)
+    ax_spectrum.legend()
+
+    fig_spectrum.tight_layout()
+    fig_spectrum.savefig(output_spectrum, dpi=160, bbox_inches="tight")
+    plt.close(fig_spectrum)
     plt.show()
 
     stats = {
@@ -75,6 +132,7 @@ def process_pcg(input_path: str) -> tuple[Path, Path, dict]:
         "rms_after": float(np.sqrt(np.mean(filtered ** 2))),
         "output_wav": str(output_wav),
         "output_plot": str(output_plot),
+        "output_spectrum": str(output_spectrum),
     }
     return output_wav, output_plot, stats
 
@@ -107,6 +165,7 @@ def main():
             f"RMS след: {stats['rms_after']:.6f}\n\n"
             f"Записан сигнал:\n{output_wav}\n\n"
             f"Графика:\n{output_plot}\n\n"
+            f"Спектрална графика:\n{stats['output_spectrum']}\n\n"
             "Резултатите са за учебна демонстрация, не за медицинска диагноза."
         )
         messagebox.showinfo("Резултат", summary)
